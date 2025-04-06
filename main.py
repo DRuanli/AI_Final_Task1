@@ -17,10 +17,10 @@ def main():
     # Create the Simulated Annealing algorithm
     sa = SimulatedAnnealing(
         function=function,
-        initial_state=(0, 0),  # Starting from origin as specified
-        max_iterations=2000,  # More iterations for better convergence
-        initial_temp=100,  # High initial temperature for exploration
-        step_size=np.pi / 32  # Step size as specified in the assignment
+        initial_state=(0, 0),
+        max_iterations=5000,  # Increased from 2000
+        initial_temp=200,  # Higher initial temperature
+        step_size=np.pi / 32
     )
 
     # Run the algorithm
