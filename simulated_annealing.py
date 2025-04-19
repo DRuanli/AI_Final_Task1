@@ -8,8 +8,8 @@ class SimulatedAnnealing:
     of a 3D function.
     """
 
-    def __init__(self, function, initial_state=(0, 0), max_iterations=1000,
-                 initial_temp=100, step_size=np.pi / 32):
+    def __init__(self, function, initial_state=(0, 0), max_iterations=10000,
+                 initial_temp=500, step_size=np.pi / 32):
         """
         Initialize the Simulated Annealing algorithm.
 
@@ -32,97 +32,72 @@ class SimulatedAnnealing:
 
     def schedule(self, t):
         """
-        Modified temperature schedule with slower cooling and initial high-temperature phase
+        Adaptive temperature schedule function. Slower cooling initially,
+        then accelerates for exploitation.
+
+        Args:
+            t (int): Current iteration
+
+        Returns:
+            float: Current temperature
         """
-        # Two-phase cooling: maintain high temperature initially then cool slowly
-        if t < self.max_iterations * 0.2:
-            return self.initial_temp * 0.9
+        if t < self.max_iterations * 0.5:
+            alpha = 0.98 - 0.0001 * t
         else:
-            alpha = 0.99  # Much slower cooling (was 0.95)
-            return self.initial_temp * (alpha ** (t - 0.2 * self.max_iterations))
+            alpha = 0.95
+        return self.initial_temp * (alpha ** t)
 
     def get_neighbor(self, state):
         """
-        Generate neighbor with adaptive exploration strategy
+        Generate a neighbor state with 50% chance to stay or move.
+
+        Args:
+            state (tuple): Current state (x, y)
+
+        Returns:
+            tuple: Neighbor state (x', y')
         """
         x, y = state
-        temp_ratio = self.current_temp / self.initial_temp
-
-        # Remove "stay in place" option
-        actions = [
-            (self.step_size, 0),  # East
-            (self.step_size, self.step_size),  # Northeast
-            (0, self.step_size),  # North
-            (-self.step_size, self.step_size),  # Northwest
-            (-self.step_size, 0),  # West
-            (-self.step_size, -self.step_size),  # Southwest
-            (0, -self.step_size),  # South
-            (self.step_size, -self.step_size)  # Southeast
-        ]
-
-        # Occasionally take larger steps when temperature is high
-        if temp_ratio > 0.5 and random.random() < 0.2:
-            multiplier = random.randint(2, 5)
+        if random.random() < 0.5:  # 50% chance to stay
+            return (x, y)
+        else:  # 50% chance to move
+            actions = [(self.step_size, 0), (self.step_size, self.step_size),
+                       (0, self.step_size), (-self.step_size, self.step_size),
+                       (-self.step_size, 0), (-self.step_size, -self.step_size),
+                       (0, -self.step_size), (self.step_size, -self.step_size)]
             dx, dy = random.choice(actions)
-            return (x + dx * multiplier, y + dy * multiplier)
-
-        # Bias toward promising regions when at lower temperatures
-        if temp_ratio < 0.3 and self.best_state != (0, 0):
-            # Move toward quadrant of best solution
-            best_x, best_y = self.best_state
-            if random.random() < 0.4:  # 40% chance of biased move
-                dx = self.step_size if best_x > x else -self.step_size
-                dy = self.step_size if best_y > y else -self.step_size
-                return (x + dx, y + dy)
-
-        dx, dy = random.choice(actions)
-        return (x + dx, y + dy)
+            return (x + dx, y + dy)
 
     def run(self):
         """
-        Modified run function with restart mechanism
+        Run the Simulated Annealing algorithm with early stopping.
+
+        Returns:
+            tuple: The best state found (x, y)
+            float: The value at the best state
+            list: List of all visited states
         """
-        global_best_state = self.best_state
-        global_best_value = self.best_value
+        best_values = [self.best_value]
+        for t in range(self.max_iterations):
+            temp = self.schedule(t)
+            if temp < 1e-10 and t > self.max_iterations * 0.3:
+                break
 
-        # Store temperature for use in neighbor selection
-        self.current_temp = self.initial_temp
+            neighbor = self.get_neighbor(self.current_state)
+            neighbor_value = self.function.evaluate(*neighbor)
+            delta_e = neighbor_value - self.current_value
 
-        # Main search with multiple restarts
-        for restart in range(3):  # Do 3 runs total
-            if restart > 0:
-                # For restarts, use best position with some random perturbation
-                x_random = random.uniform(-2, 2)
-                y_random = random.uniform(-2, 2)
-                self.current_state = (global_best_state[0] + x_random,
-                                      global_best_state[1] + y_random)
-                self.current_value = self.function.evaluate(*self.current_state)
-                self.current_temp = self.initial_temp * 0.7  # Slightly lower temp for restarts
+            if delta_e > 0 or random.random() < np.exp(delta_e / temp):
+                self.current_state = neighbor
+                self.current_value = neighbor_value
+                self.path.append(neighbor)
+                if self.current_value > self.best_value:
+                    self.best_state = self.current_state
+                    self.best_value = self.current_value
 
-            # Main simulated annealing loop
-            for t in range(self.max_iterations):
-                # Update current temperature
-                self.current_temp = self.schedule(t)
+            best_values.append(self.best_value)
+            # Early stopping if no improvement in last 1000 iterations
+            if t > 1000 and all(v == best_values[-1] for v in best_values[-1000:]):
+                break
 
-                # Generate and evaluate neighbor
-                neighbor = self.get_neighbor(self.current_state)
-                neighbor_value = self.function.evaluate(*neighbor)
-
-                # Decide whether to accept
-                delta_e = neighbor_value - self.current_value
-                if delta_e > 0 or random.random() < np.exp(delta_e / self.current_temp):
-                    self.current_state = neighbor
-                    self.current_value = neighbor_value
-                    self.path.append(neighbor)
-
-                    # Update best if current is better
-                    if self.current_value > self.best_value:
-                        self.best_state = self.current_state
-                        self.best_value = self.current_value
-
-                # Update global best if needed
-                if self.best_value > global_best_value:
-                    global_best_state = self.best_state
-                    global_best_value = self.best_value
-
-        return global_best_state, global_best_value, self.path
+        return self.best_state, self.best_value, self.path

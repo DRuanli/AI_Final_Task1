@@ -18,8 +18,8 @@ def main():
     sa = SimulatedAnnealing(
         function=function,
         initial_state=(0, 0),
-        max_iterations=5000,  # Increased from 2000
-        initial_temp=200,  # Higher initial temperature
+        max_iterations=5000,
+        initial_temp=100,
         step_size=np.pi / 32
     )
 
