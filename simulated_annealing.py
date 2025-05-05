@@ -1,13 +1,16 @@
 import random
 import math
 import numpy as np
+from typing import Tuple, List, Any, Optional, Union, Callable
+from matplotlib.axes import Axes
+from numpy.typing import NDArray
 
 class SimulatedAnnealing:
     """Class to implement the Simulated Annealing Search algorithm"""
 
-    def __init__(self, objective_function, initial_state=(0, 0),
-                 max_iterations=10000, initial_temp=100.0,
-                 alpha=0.995, step_size=np.pi/32):
+    def __init__(self, objective_function: Any, initial_state: Tuple[float, float] = (0, 0),
+                 max_iterations: int = 10000, initial_temp: float = 100.0,
+                 alpha: float = 0.995, step_size: float = np.pi/32) -> None:
         """Initialize the Simulated Annealing algorithm
 
         Args:
@@ -29,14 +32,14 @@ class SimulatedAnnealing:
         self.step_size = step_size
 
         # Track all visited states for visualization
-        self.path = [initial_state]
-        self.values = [self.current_value]
+        self.path: List[Tuple[float, float]] = [initial_state]
+        self.values: List[float] = [self.current_value]
 
         # Track statistics
-        self.accepted_moves = 0
-        self.rejected_moves = 0
+        self.accepted_moves: int = 0
+        self.rejected_moves: int = 0
 
-    def schedule(self, time_step):
+    def schedule(self, time_step: int) -> float:
         """Enhanced temperature schedule function
 
         This implements a modified exponential decay that maintains higher
@@ -56,7 +59,7 @@ class SimulatedAnnealing:
         else:
             return self.initial_temp * (0.99 ** time_step)  # Faster cooling
 
-    def generate_neighbor(self, state):
+    def generate_neighbor(self, state: Tuple[float, float]) -> Tuple[float, float]:
         """Generate a neighbor state by taking a step in x, y or both
 
         For each state (x, y), we can move with step size 0 or π/32 in any direction.
@@ -82,7 +85,7 @@ class SimulatedAnnealing:
 
         return new_state
 
-    def accept_probability(self, current_value, new_value, temperature):
+    def accept_probability(self, current_value: float, new_value: float, temperature: float) -> float:
         """Calculate probability of accepting a move
 
         If the new value is better (higher), accept with probability 1.
@@ -111,7 +114,7 @@ class SimulatedAnnealing:
             else:
                 return 1.0
 
-    def run(self):
+    def run(self) -> Tuple[Tuple[float, float], float, List[Tuple[float, float]], List[float]]:
         """Run the simulated annealing algorithm
 
         Returns:
@@ -175,7 +178,7 @@ class SimulatedAnnealing:
 
         return self.best_state, self.best_value, self.path, self.values
 
-    def visualize_path(self, ax, X, Y, Z):
+    def visualize_path(self, ax: Axes, X: NDArray, Y: NDArray, Z: NDArray) -> None:
         """Visualize the search path on the 3D surface
 
         Args:

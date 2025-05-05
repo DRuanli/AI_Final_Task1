@@ -3,12 +3,13 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import sympy as sp
 from sympy.plotting.plot import plot3d
+from typing import Tuple, Any, Callable, Optional, Union
 
 
 class Function3D:
     """Class to represent and visualize the 3D function"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the function parameters"""
         # Define symbolic variables
         self.x_sym, self.y_sym = sp.symbols('x y')
@@ -20,12 +21,13 @@ class Function3D:
                      sp.sin(self.y_sym**2/8))
 
         # Create a lambda function for numerical evaluation
-        self.f = lambda x, y: (np.sin(x/8) + np.cos(y/4) -
+        self.f: Callable[[Union[float, np.ndarray], Union[float, np.ndarray]], Union[float, np.ndarray]] = lambda x, y: (np.sin(x/8) + np.cos(y/4) -
                               np.sin(x*y/16) +
                               np.cos(x**2/16) +
                               np.sin(y**2/8))
 
-    def visualize_sympy(self, x_range=(-10, 10), y_range=(-10, 10)):
+    def visualize_sympy(self, x_range: Tuple[float, float] = (-10, 10),
+                        y_range: Tuple[float, float] = (-10, 10)) -> Any:
         """Visualize the function using sympy"""
         print("Plotting 3D surface with sympy...")
         plot = plot3d(self.f_sym, (self.x_sym, x_range[0], x_range[1]),
@@ -33,7 +35,9 @@ class Function3D:
                      title="3D Surface of f(x,y)", xlabel="x", ylabel="y")
         return plot
 
-    def visualize_matplotlib(self, x_range=(-10, 10), y_range=(-10, 10), resolution=100):
+    def visualize_matplotlib(self, x_range: Tuple[float, float] = (-10, 10),
+                            y_range: Tuple[float, float] = (-10, 10),
+                            resolution: int = 100) -> Tuple[plt.Figure, plt.Axes, np.ndarray, np.ndarray, np.ndarray]:
         """Visualize the function using matplotlib (more customizable)"""
         print("Plotting 3D surface with matplotlib...")
 
@@ -62,6 +66,6 @@ class Function3D:
 
         return fig, ax, X, Y, Z
 
-    def evaluate(self, x, y):
+    def evaluate(self, x: float, y: float) -> float:
         """Evaluate the function at a specific point"""
         return self.f(x, y)
