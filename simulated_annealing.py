@@ -1,103 +1,203 @@
-import numpy as np
 import random
-
+import math
+import numpy as np
 
 class SimulatedAnnealing:
-    """
-    Implements the Simulated Annealing algorithm to find the maximum
-    of a 3D function.
-    """
+    """Class to implement the Simulated Annealing Search algorithm"""
 
-    def __init__(self, function, initial_state=(0, 0), max_iterations=10000,
-                 initial_temp=500, step_size=np.pi / 32):
-        """
-        Initialize the Simulated Annealing algorithm.
+    def __init__(self, objective_function, initial_state=(0, 0),
+                 max_iterations=10000, initial_temp=100.0,
+                 alpha=0.995, step_size=np.pi/32):
+        """Initialize the Simulated Annealing algorithm
 
         Args:
-            function: The function to optimize
-            initial_state (tuple): The starting point (x, y)
-            max_iterations (int): Maximum number of iterations
-            initial_temp (float): Initial temperature
-            step_size (float): Step size for neighbor generation
+            objective_function: The function to optimize
+            initial_state: Starting point (default: (0,0))
+            max_iterations: Maximum number of iterations
+            initial_temp: Initial temperature
+            alpha: Cooling rate for temperature schedule
+            step_size: The step size for generating neighbors (π/32)
         """
-        self.function = function
+        self.objective_function = objective_function
         self.current_state = initial_state
         self.best_state = initial_state
-        self.current_value = function.evaluate(*initial_state)
+        self.current_value = objective_function.evaluate(*initial_state)
         self.best_value = self.current_value
         self.max_iterations = max_iterations
         self.initial_temp = initial_temp
+        self.alpha = alpha
         self.step_size = step_size
-        self.path = [initial_state]  # To track visited points
 
-    def schedule(self, t):
-        """
-        Adaptive temperature schedule function. Slower cooling initially,
-        then accelerates for exploitation.
+        # Track all visited states for visualization
+        self.path = [initial_state]
+        self.values = [self.current_value]
+
+        # Track statistics
+        self.accepted_moves = 0
+        self.rejected_moves = 0
+
+    def schedule(self, time_step):
+        """Enhanced temperature schedule function
+
+        This implements a modified exponential decay that maintains higher
+        temperatures longer in the early phases to improve exploration.
 
         Args:
-            t (int): Current iteration
+            time_step: Current iteration number
 
         Returns:
-            float: Current temperature
+            Current temperature
         """
-        if t < self.max_iterations * 0.5:
-            alpha = 0.98 - 0.0001 * t
+        # Slow cooling at the beginning, faster cooling later
+        if time_step < self.max_iterations * 0.1:
+            return self.initial_temp * (0.998 ** time_step)  # Very slow cooling
+        elif time_step < self.max_iterations * 0.5:
+            return self.initial_temp * (0.995 ** time_step)  # Medium cooling
         else:
-            alpha = 0.95
-        return self.initial_temp * (alpha ** t)
+            return self.initial_temp * (0.99 ** time_step)  # Faster cooling
 
-    def get_neighbor(self, state):
-        """
-        Generate a neighbor state with 50% chance to stay or move.
+    def generate_neighbor(self, state):
+        """Generate a neighbor state by taking a step in x, y or both
+
+        For each state (x, y), we can move with step size 0 or π/32 in any direction.
+        This gives us 9 possible neighbors including staying in place.
 
         Args:
-            state (tuple): Current state (x, y)
+            state: Current state (x, y)
 
         Returns:
-            tuple: Neighbor state (x', y')
+            Neighboring state (x_new, y_new)
         """
         x, y = state
-        if random.random() < 0.5:  # 50% chance to stay
-            return (x, y)
-        else:  # 50% chance to move
-            actions = [(self.step_size, 0), (self.step_size, self.step_size),
-                       (0, self.step_size), (-self.step_size, self.step_size),
-                       (-self.step_size, 0), (-self.step_size, -self.step_size),
-                       (0, -self.step_size), (self.step_size, -self.step_size)]
-            dx, dy = random.choice(actions)
-            return (x + dx, y + dy)
 
-    def run(self):
-        """
-        Run the Simulated Annealing algorithm with early stopping.
+        # Possible steps: -step_size, 0, step_size for both x and y
+        possible_steps = [0, self.step_size, -self.step_size]
+
+        # Randomly choose steps for x and y
+        dx = random.choice(possible_steps)
+        dy = random.choice(possible_steps)
+
+        # Calculate new state
+        new_state = (x + dx, y + dy)
+
+        return new_state
+
+    def accept_probability(self, current_value, new_value, temperature):
+        """Calculate probability of accepting a move
+
+        If the new value is better (higher), accept with probability 1.
+        Otherwise, accept with a probability that decreases as the temperature decreases.
+
+        Args:
+            current_value: Value of current state
+            new_value: Value of new state
+            temperature: Current temperature
 
         Returns:
-            tuple: The best state found (x, y)
-            float: The value at the best state
-            list: List of all visited states
+            Probability of accepting the move (0 to 1)
         """
-        best_values = [self.best_value]
-        for t in range(self.max_iterations):
-            temp = self.schedule(t)
-            if temp < 1e-10 and t > self.max_iterations * 0.3:
+        # If new value is better, always accept
+        if new_value > current_value:
+            return 1.0
+
+        # Otherwise, calculate acceptance probability
+        # We're maximizing, so we use (new - current) instead of (current - new)
+        try:
+            return math.exp((new_value - current_value) / temperature)
+        except OverflowError:
+            # Handle potential overflow when temperature is very small
+            if new_value < current_value:
+                return 0.0
+            else:
+                return 1.0
+
+    def run(self):
+        """Run the simulated annealing algorithm
+
+        Returns:
+            best_state: Best state found
+            best_value: Value of the best state
+            path: List of all visited states
+            values: Values at all visited states
+        """
+        print(f"Starting simulated annealing from {self.current_state}...")
+
+        for iteration in range(self.max_iterations):
+            # Get current temperature
+            temperature = self.schedule(iteration)
+
+            # Stop if temperature is very close to zero
+            if temperature < 1e-10:
+                print(f"Stopping early at iteration {iteration} as temperature ≈ 0")
                 break
 
-            neighbor = self.get_neighbor(self.current_state)
-            neighbor_value = self.function.evaluate(*neighbor)
-            delta_e = neighbor_value - self.current_value
+            # Generate a neighbor state
+            new_state = self.generate_neighbor(self.current_state)
 
-            if delta_e > 0 or random.random() < np.exp(delta_e / temp):
-                self.current_state = neighbor
-                self.current_value = neighbor_value
-                self.path.append(neighbor)
-                if self.current_value > self.best_value:
-                    self.best_state = self.current_state
-                    self.best_value = self.current_value
+            # Evaluate the new state
+            new_value = self.objective_function.evaluate(*new_state)
 
-            best_values.append(self.best_value)
-            # Early stopping if no improvement in last 1000 iterations
-            if t > 1000 and all(v == best_values[-1] for v in best_values[-1000:]):
-                break
+            # Calculate acceptance probability
+            p = self.accept_probability(self.current_value, new_value, temperature)
 
-        return self.best_state, self.best_value, self.path
+            # Decide whether to accept the new state
+            if random.random() < p:
+                self.current_state = new_state
+                self.current_value = new_value
+                self.accepted_moves += 1
+
+                # Update best state if this is better
+                if new_value > self.best_value:
+                    self.best_state = new_state
+                    self.best_value = new_value
+            else:
+                self.rejected_moves += 1
+
+            # Record the path (all visited states)
+            self.path.append(self.current_state)
+            self.values.append(self.current_value)
+
+            # Print progress every 1000 iterations
+            if iteration % 1000 == 0:
+                print(f"Iteration {iteration}, Temp={temperature:.6f}, " +
+                      f"Current value={self.current_value:.6f}, " +
+                      f"Best value={self.best_value:.6f}")
+
+        # Print final statistics
+        total_moves = self.accepted_moves + self.rejected_moves
+        acceptance_rate = self.accepted_moves / total_moves if total_moves > 0 else 0
+
+        print("\nSimulated Annealing completed:")
+        print(f"Best state: {self.best_state}")
+        print(f"Best value: {self.best_value}")
+        print(f"Acceptance rate: {acceptance_rate:.2%}")
+        print(f"Total iterations: {len(self.path) - 1}")
+
+        return self.best_state, self.best_value, self.path, self.values
+
+    def visualize_path(self, ax, X, Y, Z):
+        """Visualize the search path on the 3D surface
+
+        Args:
+            ax: Matplotlib 3D axis
+            X, Y, Z: Mesh grid and function values for the surface
+        """
+        # Extract x and y coordinates from path
+        path_x = [state[0] for state in self.path]
+        path_y = [state[1] for state in self.path]
+
+        # Calculate z values for each point in the path
+        path_z = [self.objective_function.evaluate(x, y) for x, y in zip(path_x, path_y)]
+
+        # Plot the path as a red line
+        ax.plot(path_x, path_y, path_z, 'r-', linewidth=2, label='Search Path')
+
+        # Highlight the starting point
+        ax.scatter(path_x[0], path_y[0], path_z[0], color='green', s=100, label='Start')
+
+        # Highlight the final point
+        ax.scatter(self.best_state[0], self.best_state[1], self.best_value,
+                  color='blue', s=100, label='Best Found')
+
+        # Add a legend
+        ax.legend()
