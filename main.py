@@ -27,9 +27,9 @@ def main() -> None:
     sa: SimulatedAnnealing = SimulatedAnnealing(
         objective_function=function,
         initial_state=(0, 0),  # Start at origin
-        max_iterations=5000,  # Increased from 5000
-        initial_temp=500.0,  # Increased from 10.0
-        alpha=0.9,  # Slower cooling (higher alpha)
+        max_iterations=15000,  # Increased from 5000
+        initial_temp=2.0,  # Increased from 10.0
+        alpha=0.85,  # Slower cooling (higher alpha)
         step_size=np.pi / 32  # Step size as specified
     )
 
